@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Department {
+  id          Int       @id @default(autoincrement())
+  code        String    @unique
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  levels      Level[]
+  students    Student[]
+}
+
+model Level {
+  id           Int        @id @default(autoincrement())
+  code         String     @unique
+  name         String
+  description  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  departmentId Int
+  department   Department @relation(fields: [departmentId], references: [id])
+  students     Student[]
+}
+
+model Student {
+  id           Int          @id @default(autoincrement())
+  firstName    String
+  lastName     String
+  email        String?
+  address      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  departmentId Int
+  levelId      Int
+  attendances  Attendance[]
+  department   Department   @relation(fields: [departmentId], references: [id])
+  level        Level        @relation(fields: [levelId], references: [id])
+}
+
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @db.Date
+  status    String   @default("ABSENT")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  studentId Int
+  student   Student  @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, date])
+}
