@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Shield, 
   User, 
@@ -42,13 +42,25 @@ export default function SettingsPage() {
   const [profileImage, setProfileImage] = useState<string | null>(user?.picture || null);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
-    firstName: user?.given_name || '',
-    lastName: user?.family_name || '',
-    email: user?.email || '',
+    firstName: '',
+    lastName: '',
+    email: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
+
+  // Mettre à jour les données du formulaire quand l'utilisateur est chargé
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        firstName: user.given_name || '',
+        lastName: user.family_name || '',
+        email: user.email || ''
+      }));
+    }
+  }, [user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -107,7 +119,7 @@ export default function SettingsPage() {
                     {profileImage ? (
                       <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
-                      user?.given_name?.charAt(0) || user?.email?.charAt(0)
+                      formData.firstName?.charAt(0) || formData.email?.charAt(0)
                     )}
                   </div>
                   <button 
@@ -141,10 +153,10 @@ export default function SettingsPage() {
                   type="text"
                   name="firstName"
                   value={formData.firstName}
-                  onChange={handleInputChange}
-                  placeholder="Votre prénom"
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  readOnly
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 cursor-not-allowed"
                 />
+                <p className="text-xs text-gray-500 mt-1">Information provenant de votre compte</p>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-gray-700">Nom</label>
@@ -152,10 +164,10 @@ export default function SettingsPage() {
                   type="text"
                   name="lastName"
                   value={formData.lastName}
-                  onChange={handleInputChange}
-                  placeholder="Votre nom"
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  readOnly
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 cursor-not-allowed"
                 />
+                <p className="text-xs text-gray-500 mt-1">Information provenant de votre compte</p>
               </div>
               <div className="space-y-1.5 col-span-2">
                 <label className="text-sm font-medium text-gray-700">Email</label>
@@ -163,10 +175,10 @@ export default function SettingsPage() {
                   type="email"
                   name="email"
                   value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="Votre email"
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  readOnly
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 cursor-not-allowed"
                 />
+                <p className="text-xs text-gray-500 mt-1">Information provenant de votre compte</p>
               </div>
             </div>
           </motion.div>
@@ -276,38 +288,40 @@ export default function SettingsPage() {
               {renderSectionContent()}
 
               {/* Bouton de sauvegarde */}
-              <motion.div 
-                className="mt-8 pt-6 border-t border-gray-200"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <div className="flex justify-end">
-                  <motion.button
-                    onClick={handleSaveSettings}
-                    disabled={isSaving}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`
-                      flex items-center gap-2 px-6 py-2.5 
-                      ${isSaving ? 'bg-gray-400' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'} 
-                      text-white rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/25
-                    `}
-                  >
-                    {isSaving ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Sauvegarde en cours...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-5 h-5" />
-                        Sauvegarder les modifications
-                      </>
-                    )}
-                  </motion.button>
-                </div>
-              </motion.div>
+              {activeSection === 'security' && (
+                <motion.div 
+                  className="mt-8 pt-6 border-t border-gray-200"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <div className="flex justify-end">
+                    <motion.button
+                      onClick={handleSaveSettings}
+                      disabled={isSaving}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`
+                        flex items-center gap-2 px-6 py-2.5 
+                        ${isSaving ? 'bg-gray-400' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'} 
+                        text-white rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/25
+                      `}
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Sauvegarde en cours...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-5 h-5" />
+                          Sauvegarder les modifications
+                        </>
+                      )}
+                    </motion.button>
+                  </div>
+                </motion.div>
+              )}
             </div>
           </div>
         </div>

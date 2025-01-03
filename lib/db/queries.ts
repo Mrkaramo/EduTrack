@@ -1,6 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from './prisma';
+import type { DepartmentCode } from '../types';
 
 export async function getStudents(departmentCode?: string, levelCode?: string) {
   console.log('Début getStudents avec params:', { departmentCode, levelCode });
@@ -239,5 +238,140 @@ export async function markAttendance(
   } catch (error) {
     console.error('Error marking attendance:', error);
     throw error;
+  }
+}
+
+export async function getAttendanceReport(date: Date) {
+  try {
+    // Normaliser la date pour ne garder que la partie date (sans l'heure)
+    const normalizedDate = new Date(date);
+    normalizedDate.setUTCHours(0, 0, 0, 0);
+
+    // 1. Récupérer tous les étudiants avec leurs informations
+    const allStudents = await prisma.student.findMany({
+      include: {
+        department: true,
+        level: true,
+        attendances: {
+          where: {
+            date: normalizedDate
+          }
+        }
+      },
+      orderBy: [
+        { lastName: 'asc' },
+        { firstName: 'asc' }
+      ]
+    });
+
+    // 2. Transformer les données pour le rapport
+    const attendanceReport = {
+      date: normalizedDate,
+      totalStudents: allStudents.length,
+      presentCount: 0,
+      absentCount: 0,
+      departmentStats: new Map<string, { total: number; present: number; absent: number }>(),
+      levelStats: new Map<string, { total: number; present: number; absent: number }>(),
+      students: allStudents.map(student => {
+        const isPresent = student.attendances.some(a => a.status === 'PRESENT');
+        
+        // Mettre à jour les compteurs globaux
+        if (isPresent) {
+          attendanceReport.presentCount++;
+        } else {
+          attendanceReport.absentCount++;
+        }
+
+        // Mettre à jour les statistiques par département
+        const deptStats = attendanceReport.departmentStats.get(student.department.code) || { 
+          total: 0, 
+          present: 0, 
+          absent: 0 
+        };
+        deptStats.total++;
+        if (isPresent) deptStats.present++; else deptStats.absent++;
+        attendanceReport.departmentStats.set(student.department.code, deptStats);
+
+        // Mettre à jour les statistiques par niveau
+        const levelStats = attendanceReport.levelStats.get(student.level.code) || { 
+          total: 0, 
+          present: 0, 
+          absent: 0 
+        };
+        levelStats.total++;
+        if (isPresent) levelStats.present++; else levelStats.absent++;
+        attendanceReport.levelStats.set(student.level.code, levelStats);
+
+        return {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          email: student.email,
+          departmentCode: student.department.code,
+          departmentName: student.department.name,
+          levelCode: student.level.code,
+          levelName: student.level.name,
+          status: isPresent ? 'PRESENT' : 'ABSENT',
+          attendance: student.attendances[0] || null
+        };
+      })
+    };
+
+    // 3. Calculer les statistiques supplémentaires
+    const stats = {
+      global: {
+        total: attendanceReport.totalStudents,
+        present: attendanceReport.presentCount,
+        absent: attendanceReport.absentCount,
+        presenceRate: Math.round((attendanceReport.presentCount / attendanceReport.totalStudents) * 100) || 0
+      },
+      departments: Object.fromEntries(
+        Array.from(attendanceReport.departmentStats.entries()).map(([code, stats]) => [
+          code,
+          {
+            ...stats,
+            presenceRate: Math.round((stats.present / stats.total) * 100) || 0
+          }
+        ])
+      ),
+      levels: Object.fromEntries(
+        Array.from(attendanceReport.levelStats.entries()).map(([code, stats]) => [
+          code,
+          {
+            ...stats,
+            presenceRate: Math.round((stats.present / stats.total) * 100) || 0
+          }
+        ])
+      )
+    };
+
+    return {
+      date: normalizedDate,
+      students: attendanceReport.students,
+      stats
+    };
+  } catch (error) {
+    console.error('Erreur lors de la génération du rapport de présence:', error);
+    throw error;
+  }
+}
+
+export async function getStudentCount(departmentCode: DepartmentCode, levelCode: string) {
+  try {
+    const count = await prisma.student.count({
+      where: {
+        department: {
+          code: departmentCode
+        },
+        level: {
+          code: levelCode
+        }
+      },
+    });
+    
+    return count;
+  } catch (error) {
+    console.error('Erreur lors du comptage des étudiants:', error);
+    return 0;
   }
 } 
