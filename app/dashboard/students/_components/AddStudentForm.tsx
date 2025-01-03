@@ -274,14 +274,14 @@ export default function AddStudentForm({ onSuccess }: AddStudentFormProps) {
                   id="firstName"
                   required
                   icon={User}
-                  placeholder="John"
+                  placeholder="Mohammed"
                 />
                 <FormInput
                   label="Nom"
                   id="lastName"
                   required
                   icon={User}
-                  placeholder="Doe"
+                  placeholder="EL Amrani"
                 />
               </div>
 
@@ -290,7 +290,7 @@ export default function AddStudentForm({ onSuccess }: AddStudentFormProps) {
                 id="email"
                 type="email"
                 icon={Mail}
-                placeholder="john.doe@etu.uae.ac.ma"
+                placeholder="mohammed.elamrani@etu.uae.ac.ma"
               />
 
               <FormInput

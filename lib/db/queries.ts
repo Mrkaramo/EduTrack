@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import type { DepartmentCode } from '../types';
+import { format } from 'date-fns';
 
 export async function getStudents(departmentCode?: string, levelCode?: string) {
   console.log('Début getStudents avec params:', { departmentCode, levelCode });
@@ -140,6 +141,16 @@ export async function deleteStudent(id: number) {
   console.log('Début deleteStudent avec id:', id);
   
   try {
+    // 1. Supprimer d'abord toutes les présences associées à l'étudiant
+    await prisma.attendance.deleteMany({
+      where: {
+        studentId: id
+      }
+    });
+    
+    console.log('Présences supprimées avec succès');
+
+    // 2. Ensuite, supprimer l'étudiant
     const student = await prisma.student.delete({
       where: { id },
       include: {
@@ -373,5 +384,168 @@ export async function getStudentCount(departmentCode: DepartmentCode, levelCode:
   } catch (error) {
     console.error('Erreur lors du comptage des étudiants:', error);
     return 0;
+  }
+}
+
+export async function getWeeklyAttendanceStats(
+  departmentCode: DepartmentCode,
+  levelCode: string,
+  startDate: Date = new Date('2025-01-01') // 1er janvier 2025
+) {
+  try {
+    console.log('Début getWeeklyAttendanceStats avec:', { departmentCode, levelCode, startDate });
+
+    // Calculer la date de fin (7 janvier 2025)
+    const endDate = new Date('2025-01-07');
+    console.log('Période de calcul:', { startDate, endDate });
+
+    // 1. Récupérer tous les étudiants du département et niveau
+    const students = await prisma.student.findMany({
+      where: {
+        department: {
+          code: departmentCode
+        },
+        level: {
+          code: levelCode
+        }
+      },
+      select: {
+        id: true
+      }
+    });
+
+    const totalStudents = students.length;
+    console.log('Nombre total d\'étudiants:', totalStudents);
+
+    // 2. Récupérer toutes les présences pour ces étudiants sur la période spécifique
+    const attendances = await prisma.attendance.findMany({
+      where: {
+        studentId: {
+          in: students.map(s => s.id)
+        },
+        date: {
+          gte: startDate,
+          lte: endDate
+        },
+        status: 'PRESENT'
+      }
+    });
+
+    console.log('Nombre de présences trouvées:', attendances.length);
+
+    // 3. Calculer les statistiques
+    const totalPossiblePresences = totalStudents * 7; // nombre d'étudiants * 7 jours
+    const totalPresences = attendances.length;
+    const totalAbsences = totalPossiblePresences - totalPresences;
+
+    const tauxPresence = totalPossiblePresences > 0 
+      ? Math.round((totalPresences / totalPossiblePresences) * 100)
+      : 0;
+    const tauxAbsence = 100 - tauxPresence;
+
+    console.log('Statistiques calculées:', {
+      totalPossiblePresences,
+      totalPresences,
+      totalAbsences,
+      tauxPresence,
+      tauxAbsence
+    });
+
+    return [{
+      label: 'Première semaine de janvier 2025',
+      tauxPresence,
+      tauxAbsence,
+      totalPresences,
+      totalAbsences,
+      totalEtudiants: totalStudents,
+      periode: `01/01/2025 - 07/01/2025`
+    }];
+  } catch (error) {
+    console.error('Erreur détaillée dans getWeeklyAttendanceStats:', error);
+    throw error;
+  }
+}
+
+export async function getMonthlyAttendanceStats(departmentCode: DepartmentCode, levelCode: string) {
+  console.log('Récupération des statistiques mensuelles:', { departmentCode, levelCode });
+  
+  try {
+    // Définir la période (Janvier 2025)
+    const startDate = new Date('2025-01-01');
+    const endDate = new Date('2025-01-31');
+
+    // 1. Récupérer tous les étudiants du département et niveau
+    const students = await prisma.student.findMany({
+      where: {
+        department: {
+          code: departmentCode
+        },
+        level: {
+          code: levelCode
+        }
+      },
+      select: {
+        id: true
+      }
+    });
+
+    const totalStudents = students.length;
+    console.log('Nombre total d\'étudiants:', totalStudents);
+
+    // 2. Récupérer toutes les présences pour ces étudiants sur la période spécifique
+    const attendances = await prisma.attendance.findMany({
+      where: {
+        studentId: {
+          in: students.map(s => s.id)
+        },
+        date: {
+          gte: startDate,
+          lte: endDate
+        },
+        status: 'PRESENT'
+      }
+    });
+
+    console.log('Nombre de présences trouvées:', attendances.length);
+
+    // 3. Calculer les statistiques
+    const totalPossiblePresences = totalStudents * 31; // nombre d'étudiants * nombre de jours dans le mois
+    const totalPresences = attendances.length;
+    const totalAbsences = totalPossiblePresences - totalPresences;
+
+    const tauxPresence = totalPossiblePresences > 0 
+      ? Math.round((totalPresences / totalPossiblePresences) * 100)
+      : 0;
+    const tauxAbsence = 100 - tauxPresence;
+
+    console.log('Statistiques calculées:', {
+      totalPossiblePresences,
+      totalPresences,
+      totalAbsences,
+      tauxPresence,
+      tauxAbsence
+    });
+
+    // Retourner les statistiques
+    return [{
+      label: 'Statistiques du mois',
+      tauxPresence,
+      tauxAbsence,
+      totalPresences,
+      totalAbsences,
+      totalEtudiants: totalStudents,
+      periode: 'Janvier 2025'
+    }];
+  } catch (error) {
+    console.error('Erreur lors de la récupération des statistiques mensuelles:', error);
+    return [{
+      label: 'Statistiques du mois',
+      tauxPresence: 0,
+      tauxAbsence: 0,
+      totalPresences: 0,
+      totalAbsences: 0,
+      totalEtudiants: 0,
+      periode: 'Aucune donnée'
+    }];
   }
 } 

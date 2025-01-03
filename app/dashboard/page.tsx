@@ -10,10 +10,9 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  LineChart,
-  Line,
+  AreaChart,
   Area,
-  AreaChart
+  LabelList
 } from 'recharts';
 import { Building2, ChevronDown, Users } from 'lucide-react';
 import { format } from 'date-fns';
@@ -56,31 +55,82 @@ export default function DashboardPage() {
     fetchStudentCount();
   }, [selectedDepartment, selectedLevel]);
 
-  // Charger les données des graphiques
+  // Charger les statistiques de présence
   useEffect(() => {
-    // Données hebdomadaires
-    const weekly = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - i));
-      return {
-        date: format(date, 'EEE', { locale: fr }),
-        présents: Math.floor(Math.random() * 30) + 20,
-        absents: Math.floor(Math.random() * 10)
-      };
-    });
-    setWeeklyStats(weekly);
+    const fetchStats = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Statistiques hebdomadaires
+        const weeklyResponse = await fetch(
+          `/api/dashboard/attendance-stats?departmentCode=${selectedDepartment}&levelCode=${selectedLevel}&type=weekly`
+        );
+        
+        if (weeklyResponse.ok) {
+          const weeklyData = await weeklyResponse.json();
+          setWeeklyStats(weeklyData.stats || [{
+            label: 'Statistiques de la semaine',
+            tauxPresence: 0,
+            tauxAbsence: 0,
+            totalPresences: 0,
+            totalAbsences: 0,
+            totalEtudiants: 0,
+            periode: 'Aucune donnée'
+          }]);
+        } else {
+          throw new Error('Erreur lors de la récupération des statistiques hebdomadaires');
+        }
 
-    // Données mensuelles
-    const monthly = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (29 - i));
-      return {
-        date: format(date, 'dd MMM', { locale: fr }),
-        'taux_présence': Math.floor(Math.random() * 40) + 60
-      };
-    });
-    setMonthlyStats(monthly);
+        // Statistiques mensuelles
+        const monthlyResponse = await fetch(
+          `/api/dashboard/attendance-stats?departmentCode=${selectedDepartment}&levelCode=${selectedLevel}&type=monthly`
+        );
+        
+        if (monthlyResponse.ok) {
+          const monthlyData = await monthlyResponse.json();
+          setMonthlyStats(monthlyData.stats || [{
+            label: 'Statistiques du mois',
+            tauxPresence: 0,
+            tauxAbsence: 0,
+            totalPresences: 0,
+            totalAbsences: 0,
+            totalEtudiants: 0,
+            periode: 'Aucune donnée'
+          }]);
+        } else {
+          throw new Error('Erreur lors de la récupération des statistiques mensuelles');
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des statistiques:', error);
+        // Réinitialiser les stats en cas d'erreur
+        setWeeklyStats([{
+          label: 'Statistiques de la semaine',
+          tauxPresence: 0,
+          tauxAbsence: 0,
+          totalPresences: 0,
+          totalAbsences: 0,
+          totalEtudiants: 0,
+          periode: 'Erreur de chargement'
+        }]);
+        setMonthlyStats([{
+          label: 'Statistiques du mois',
+          tauxPresence: 0,
+          tauxAbsence: 0,
+          totalPresences: 0,
+          totalAbsences: 0,
+          totalEtudiants: 0,
+          periode: 'Erreur de chargement'
+        }]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStats();
   }, [selectedDepartment, selectedLevel]);
+
+  // Log des stats avant le rendu
+  console.log('Stats avant rendu:', { weeklyStats });
 
   return (
     <div className="p-6 space-y-8">
@@ -158,65 +208,199 @@ export default function DashboardPage() {
       {/* Graphiques */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Statistiques hebdomadaires */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">
-            Présences de la semaine
-          </h3>
-          <div className="h-[300px]">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+          <div className="flex flex-col space-y-2 mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Statistiques de présence hebdomadaire
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {selectedDepartment} - {selectedLevel}
+                </p>
+              </div>
+              <div className="px-3 py-1 bg-blue-50 rounded-full">
+                <p className="text-xs font-medium text-blue-600">
+                  01/01 - 07/01/2025
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Graphique hebdomadaire */}
+          <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyStats} margin={{ top: 0, right: 0, bottom: 0, left: -15 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
-                <XAxis dataKey="date" stroke="#6B7280" />
-                <YAxis stroke="#6B7280" />
+              <BarChart 
+                data={weeklyStats} 
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                barGap={30}
+              >
+                <defs>
+                  <linearGradient id="colorPresence" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0.6}/>
+                  </linearGradient>
+                  <linearGradient id="colorAbsence" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0.6}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                <XAxis 
+                  dataKey="label" 
+                  tick={false}
+                  axisLine={false}
+                />
+                <YAxis 
+                  domain={[0, 100]}
+                  tickFormatter={(value) => `${value}%`}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                />
                 <Tooltip 
+                  formatter={(value: number) => [`${value}%`]}
                   contentStyle={{
                     backgroundColor: 'white',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '0.5rem',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    border: 'none',
+                    borderRadius: '0.75rem',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+                  }}
+                  cursor={{ fill: 'transparent' }}
+                />
+                <Legend 
+                  wrapperStyle={{
+                    paddingTop: '20px'
                   }}
                 />
-                <Bar dataKey="présents" name="Présents" fill="#4F46E5" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="absents" name="Absents" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                <Bar 
+                  dataKey="tauxPresence" 
+                  name="Taux de présence" 
+                  fill="url(#colorPresence)"
+                  radius={[8, 8, 0, 0]}
+                  maxBarSize={100}
+                >
+                  <LabelList
+                    dataKey="tauxPresence"
+                    position="top"
+                    formatter={(value: number) => `${value}%`}
+                    style={{ fill: '#4F46E5', fontSize: '13px', fontWeight: 'bold' }}
+                  />
+                </Bar>
+                <Bar 
+                  dataKey="tauxAbsence" 
+                  name="Taux d'absence" 
+                  fill="url(#colorAbsence)"
+                  radius={[8, 8, 0, 0]}
+                  maxBarSize={100}
+                >
+                  <LabelList
+                    dataKey="tauxAbsence"
+                    position="top"
+                    formatter={(value: number) => `${value}%`}
+                    style={{ fill: '#EF4444', fontSize: '13px', fontWeight: 'bold' }}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Évolution mensuelle */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">
-            Évolution mensuelle des présences
-          </h3>
-          <div className="h-[300px]">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+          <div className="flex flex-col space-y-2 mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Évolution mensuelle des présences
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {selectedDepartment} - {selectedLevel}
+                </p>
+              </div>
+              <div className="px-3 py-1 bg-blue-50 rounded-full">
+                <p className="text-xs font-medium text-blue-600">
+                  Janvier 2025
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Graphique mensuel */}
+          <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyStats} margin={{ top: 0, right: 0, bottom: 0, left: -15 }}>
+              <BarChart 
+                data={monthlyStats} 
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                barGap={30}
+              >
                 <defs>
-                  <linearGradient id="colorPresence" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
+                  <linearGradient id="colorPresenceMonthly" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0.6}/>
+                  </linearGradient>
+                  <linearGradient id="colorAbsenceMonthly" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0.6}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
-                <XAxis dataKey="date" stroke="#6B7280" />
-                <YAxis stroke="#6B7280" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                <XAxis 
+                  dataKey="label" 
+                  tick={false}
+                  axisLine={false}
+                />
+                <YAxis 
+                  domain={[0, 100]}
+                  tickFormatter={(value) => `${value}%`}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                />
                 <Tooltip 
+                  formatter={(value: number) => [`${value}%`]}
                   contentStyle={{
                     backgroundColor: 'white',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '0.5rem',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    border: 'none',
+                    borderRadius: '0.75rem',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+                  }}
+                  cursor={{ fill: 'transparent' }}
+                />
+                <Legend 
+                  wrapperStyle={{
+                    paddingTop: '20px'
                   }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="taux_présence" 
-                  name="Taux de présence"
-                  stroke="#4F46E5" 
-                  fillOpacity={1}
-                  fill="url(#colorPresence)"
-                />
-              </AreaChart>
+                <Bar 
+                  dataKey="tauxPresence" 
+                  name="Taux de présence" 
+                  fill="url(#colorPresenceMonthly)"
+                  radius={[8, 8, 0, 0]}
+                  maxBarSize={100}
+                >
+                  <LabelList
+                    dataKey="tauxPresence"
+                    position="top"
+                    formatter={(value: number) => `${value}%`}
+                    style={{ fill: '#4F46E5', fontSize: '13px', fontWeight: 'bold' }}
+                  />
+                </Bar>
+                <Bar 
+                  dataKey="tauxAbsence" 
+                  name="Taux d'absence" 
+                  fill="url(#colorAbsenceMonthly)"
+                  radius={[8, 8, 0, 0]}
+                  maxBarSize={100}
+                >
+                  <LabelList
+                    dataKey="tauxAbsence"
+                    position="top"
+                    formatter={(value: number) => `${value}%`}
+                    style={{ fill: '#EF4444', fontSize: '13px', fontWeight: 'bold' }}
+                  />
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
